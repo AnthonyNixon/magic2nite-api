@@ -5,6 +5,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -12,6 +13,16 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
+
+var letters = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func newPodCode() string {
+	b := make([]rune, 4)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
 
 func main() {
 	DB_USER := os.Getenv("M2NDBUSER")
@@ -31,55 +42,52 @@ func main() {
 		fmt.Print(err.Error())
 	}
 	type Pod struct {
-		Id         string    `json:"id"`
-		MaxPlayers int       `json:"max"`
-		MinPlayers int       `json:"min"`
+		Id         int       `json:"id"`
+		ShortCode  string    `json:"short_code"`
+		MaxPlayers int       `json:"max_players"`
+		MinPlayers int       `json:"min_players"`
 		Location   string    `json:"location"`
-		StartTime  time.Time `json:"start"`
-		CutoffTime time.Time `json:"cutoffTime"`
+		StartTime  time.Time `json:"start_time"`
+		CutoffTime time.Time `json:"cutoff_time"`
+		Private    bool      `json:"private"`
+		Password   string    `json:"password"`
+		Format     string    `json:"format"`
 	}
 
 	router := gin.Default()
 	// Add API handlers here
 
-	// GET a cronjob
-	router.GET("/pod/:id", func(c *gin.Context) {
-		var (
-			pod    Pod
-			result gin.H
-		)
-		id := c.Param("id")
-		row := db.QueryRow("select id, name, crondef, command, description, active, logtime from jobs where id = ?;", id)
-		err = row.Scan(&cronjob.Id, &cronjob.Name, &cronjob.Cron_def, &cronjob.Command, &cronjob.Description, &cronjob.Active, &cronjob.Logtime)
+	// GET a pod
+	router.GET("/pod/:shortCode", func(c *gin.Context) {
+		var pod Pod
+
+		shortCode := c.Param("shortCode")
+		row := db.QueryRow("select id, short_code, max_players, min_players, private, password, format, location, start_time, cutoff_time from pods where short_code = ?;", shortCode)
+		err = row.Scan(&pod.Id, &pod.ShortCode, &pod.MaxPlayers, &pod.MinPlayers, &pod.Private, &pod.Password, &pod.Format, &pod.Location, &pod.StartTime, &pod.CutoffTime)
 		if err != nil {
 			// if no results, send null
-			result = gin.H{
-				"result": nil,
-				"count":  0,
-			}
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.JSON(http.StatusNotFound, nil)
 		} else {
-			result = gin.H{
-				"result": cronjob,
-				"count":  1,
-			}
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.JSON(http.StatusOK, pod)
 		}
-		c.JSON(http.StatusOK, result)
 	})
 
-	// GET all cronjobs
+	// GET all pods
 	router.GET("/pods", func(c *gin.Context) {
 		var (
-			cronjob  Cronjob
-			cronjobs []Cronjob
+			pod  Pod
+			pods []Pod
 		)
 
-		rows, err := db.Query("SELECT id, name, crondef, command, description, active, logtime from jobs;")
+		rows, err := db.Query("SELECT id, short_code, max_players, min_players, private, password, format, location, start_time, cutoff_time from pods;")
 		if err != nil {
 			fmt.Print(err.Error())
 		}
 		for rows.Next() {
-			err = rows.Scan(&cronjob.Id, &cronjob.Name, &cronjob.Cron_def, &cronjob.Command, &cronjob.Description, &cronjob.Active, &cronjob.Logtime)
-			cronjobs = append(cronjobs, cronjob)
+			err = rows.Scan(&pod.Id, &pod.ShortCode, &pod.MaxPlayers, &pod.MinPlayers, &pod.Private, &pod.Password, &pod.Format, &pod.Location, &pod.StartTime, &pod.CutoffTime)
+			pods = append(pods, pod)
 			if err != nil {
 				fmt.Print(err.Error())
 			}
@@ -88,22 +96,25 @@ func main() {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers")
 		c.JSON(http.StatusOK, gin.H{
-			"result": cronjobs,
-			"count":  len(cronjobs),
+			"result": pods,
+			"count":  len(pods),
 		})
 	})
 
-	// POST new cronjob
+	// POST new pod
 	router.POST("/pod", func(c *gin.Context) {
-		var cronjob Cronjob
-		c.BindJSON(&cronjob)
+		var pod Pod
+		c.BindJSON(&pod)
 
-		stmt, err := db.Prepare("insert into jobs (name, crondef, command, description, active) values(?,?,?,?,?);")
+		var shortCode = newPodCode()
+		pod.ShortCode = shortCode
+
+		stmt, err := db.Prepare("insert into pods (short_code, max_players, min_players, private, password, format, location, start_time, cutoff_time) values(?,?,?,?,?,?,?,?,?);")
 		if err != nil {
 			fmt.Print(err.Error())
 		}
 
-		_, err = stmt.Exec(cronjob.Name, cronjob.Cron_def, cronjob.Command, cronjob.Description, cronjob.Active)
+		_, err = stmt.Exec(shortCode, pod.MaxPlayers, pod.MinPlayers, pod.Private, pod.Password, pod.Format, pod.Location, pod.StartTime, pod.CutoffTime)
 
 		if err != nil {
 			fmt.Print(err.Error())
@@ -111,44 +122,7 @@ func main() {
 
 		// Append strings
 		defer stmt.Close()
-		c.JSON(http.StatusOK, cronjob)
-	})
-
-	router.PUT("/pod", func(c *gin.Context) {
-		var cronjob Cronjob
-		c.BindJSON(&cronjob)
-
-		stmt, err := db.Prepare("update jobs set name = ?, crondef = ?, command = ?, description = ?, active = ? where id = ?;")
-
-		if err != nil {
-			fmt.Print(err.Error())
-		}
-
-		_, err = stmt.Exec(cronjob.Name, cronjob.Cron_def, cronjob.Command, cronjob.Description, cronjob.Active, cronjob.Id)
-		if err != nil {
-			fmt.Print(err.Error())
-		}
-
-		defer stmt.Close()
-		c.JSON(http.StatusOK, cronjob)
-	})
-
-	router.DELETE("/pod/:id", func(c *gin.Context) {
-		id := c.Param("id")
-		stmt, err := db.Prepare("delete from jobs where id=?;")
-		if err != nil {
-			fmt.Print(err.Error())
-		}
-
-		_, err = stmt.Exec(id)
-		if err != nil {
-			fmt.Print(err.Error())
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": fmt.Sprintf("Successfully deleted job with id: %s", id),
-		})
-
+		c.JSON(http.StatusOK, pod)
 	})
 
 	router.OPTIONS("/pod", func(c *gin.Context) {
