@@ -54,6 +54,12 @@ func main() {
 		Format     string    `json:"format"`
 	}
 
+	type Player struct {
+		Pod   string `json:"pod"`
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+
 	router := gin.Default()
 	// Add API handlers here
 
@@ -120,9 +126,58 @@ func main() {
 			fmt.Print(err.Error())
 		}
 
-		// Append strings
 		defer stmt.Close()
 		c.JSON(http.StatusOK, pod)
+	})
+
+	// POST adds player to pod
+	router.POST("/pod/:shortCode/player", func(c *gin.Context) {
+		var player Player
+		c.BindJSON(&player)
+		player.Pod = c.Param("shortCode")
+
+		stmt, err := db.Prepare("insert into playerstopod (pod, player_email, player_name) values(?,?,?);")
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+
+		_, err = stmt.Exec(player.Pod, player.Email, player.Name)
+
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+
+		defer stmt.Close()
+		c.JSON(http.StatusOK, player)
+	})
+
+	// GET all players belonging to a pod
+	router.GET("/pod/:shortCode/players", func(c *gin.Context) {
+		var (
+			player  Player
+			players []Player
+		)
+
+		shortCode := c.Param("shortCode")
+
+		rows, err := db.Query("SELECT pod, player_email, player_name from playerstopod where pod = ?;", shortCode)
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+		for rows.Next() {
+			err = rows.Scan(&player.Pod, &player.Email, &player.Name)
+			players = append(players, player)
+			if err != nil {
+				fmt.Print(err.Error())
+			}
+		}
+		defer rows.Close()
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers")
+		c.JSON(http.StatusOK, gin.H{
+			"result": players,
+			"count":  len(players),
+		})
 	})
 
 	router.OPTIONS("/pod", func(c *gin.Context) {
