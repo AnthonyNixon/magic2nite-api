@@ -127,6 +127,8 @@ func main() {
 		}
 
 		defer stmt.Close()
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers")
 		c.JSON(http.StatusOK, pod)
 	})
 
@@ -148,6 +150,8 @@ func main() {
 		}
 
 		defer stmt.Close()
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers, Content-Type")
 		c.JSON(http.StatusOK, player)
 	})
 
@@ -194,7 +198,7 @@ func main() {
 
 	router.OPTIONS("/pod/:shortCode/player", func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers")
+		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers, Content-Type")
 		c.JSON(http.StatusOK, struct{}{})
 	})
 
