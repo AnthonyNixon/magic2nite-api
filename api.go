@@ -192,6 +192,18 @@ func main() {
 		c.JSON(http.StatusOK, struct{}{})
 	})
 
+	router.OPTIONS("/pod/:shortCode/player", func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers")
+		c.JSON(http.StatusOK, struct{}{})
+	})
+
+	router.OPTIONS("/pod/:shortCode/players", func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers")
+		c.JSON(http.StatusOK, struct{}{})
+	})
+
 	router.Use(cors.Default())
 
 	router.Run(":3000")
