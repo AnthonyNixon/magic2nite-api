@@ -25,6 +25,7 @@ func newPodCode() string {
 }
 
 func main() {
+	rand.Seed(time.Now().UTC().UnixNano())
 	DB_USER := os.Getenv("M2NDBUSER")
 	DB_PASS := os.Getenv("M2NDBPASS")
 	DB_HOST := os.Getenv("DBHOST")
