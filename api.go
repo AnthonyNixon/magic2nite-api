@@ -207,6 +207,29 @@ func main() {
 		})
 	})
 
+	// DELETE removes a player from a pod
+	router.POST("/pod/:shortCode/player", func(c *gin.Context) {
+		var player Player
+		c.BindJSON(&player)
+		player.Pod = c.Param("shortCode")
+
+		stmt, err := db.Prepare("delete from playerstopod where pod = ? and player_email = ?;")
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+
+		_, err = stmt.Exec(player.Pod, player.Email)
+
+		if err != nil {
+			fmt.Print(err.Error())
+		}
+
+		defer stmt.Close()
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers, Content-Type")
+		c.JSON(http.StatusOK, nil)
+	})
+
 	router.OPTIONS("/pod", func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers, Content-Type")
