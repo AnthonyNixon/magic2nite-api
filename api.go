@@ -113,7 +113,29 @@ func main() {
 		var pod Pod
 		c.BindJSON(&pod)
 
-		var shortCode = newPodCode()
+		var shortCode string = ""
+		var shortCheck string
+
+		for shortCode == "" {
+			shortCode = newPodCode()
+			rows, err := db.Query("SELECT short_code from pods where short_code = ?;", shortCode)
+			if err != nil {
+				fmt.Print(err.Error())
+			}
+
+			for rows.Next() {
+				err = rows.Scan(shortCheck)
+				if err != nil {
+					fmt.Print(err.Error())
+				}
+			}
+
+			if shortCheck != "" {
+				shortCode = ""
+			}
+
+		}
+
 		pod.ShortCode = shortCode
 
 		stmt, err := db.Prepare("insert into pods (short_code, max_players, min_players, private, password, format, location, start_time, cutoff_time) values(?,?,?,?,?,?,?,?,?);")
