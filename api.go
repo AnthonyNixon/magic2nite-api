@@ -208,7 +208,7 @@ func main() {
 	})
 
 	// DELETE removes a player from a pod
-	router.POST("/pod/:shortCode/player", func(c *gin.Context) {
+	router.DELETE("/pod/:shortCode/player", func(c *gin.Context) {
 		var player Player
 		c.BindJSON(&player)
 		player.Pod = c.Param("shortCode")
