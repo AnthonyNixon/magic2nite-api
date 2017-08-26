@@ -113,12 +113,15 @@ func main() {
 		var pod Pod
 		c.BindJSON(&pod)
 
+		var shortCode = newPodCode()
+		pod.ShortCode = shortCode
+
 		stmt, err := db.Prepare("insert into pods (short_code, max_players, min_players, private, password, format, location, start_time, cutoff_time) values(?,?,?,?,?,?,?,?,?);")
 		if err != nil {
 			fmt.Print(err.Error())
 		}
 
-		_, err = stmt.Exec(newPodCode(), pod.MaxPlayers, pod.MinPlayers, pod.Private, pod.Password, pod.Format, pod.Location, pod.StartTime, pod.CutoffTime)
+		_, err = stmt.Exec(shortCode, pod.MaxPlayers, pod.MinPlayers, pod.Private, pod.Password, pod.Format, pod.Location, pod.StartTime, pod.CutoffTime)
 
 		if err != nil {
 			fmt.Print(err.Error())
