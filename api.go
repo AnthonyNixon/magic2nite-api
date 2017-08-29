@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"regexp"
 )
 
 var letters = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -59,6 +60,10 @@ func main() {
 		Pod   string `json:"pod"`
 		Email string `json:"email"`
 		Name  string `json:"name"`
+	}
+
+	type ErrorResponse struct {
+		Error string `json:"error"`
 	}
 
 	router := gin.Default()
@@ -161,21 +166,49 @@ func main() {
 		c.BindJSON(&player)
 		player.Pod = c.Param("shortCode")
 
-		stmt, err := db.Prepare("insert into playerstopod (pod, player_email, player_name) values(?,?,?);")
+		var errorResponse ErrorResponse
+		var error = false
+
+		// Begin error checking
+		// Check that email resembles an email address
+		r, _ := regexp.Compile(".+@.+..+")
+		if !r.MatchString(player.Email) {
+			errorResponse.Error = "Email address not valid"
+			error = true
+		}
+
+		// Check for duplicate email address already in the pod
+		rows, err := db.Query("SELECT player_email from playerstopod where player_email = ? and pod = ?;", player.Email, player.Pod)
 		if err != nil {
 			fmt.Print(err.Error())
 		}
 
-		_, err = stmt.Exec(player.Pod, player.Email, player.Name)
-
-		if err != nil {
-			fmt.Print(err.Error())
+		for rows.Next() {
+			errorResponse.Error = "Duplicate player in pod."
+			error = true
 		}
 
-		defer stmt.Close()
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers, Content-Type")
-		c.JSON(http.StatusOK, player)
+		if error {
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers, Content-Type")
+			c.JSON(http.StatusBadRequest, errorResponse)
+		} else {
+			stmt, err := db.Prepare("insert into playerstopod (pod, player_email, player_name) values(?,?,?);")
+			if err != nil {
+				fmt.Print(err.Error())
+			}
+
+			_, err = stmt.Exec(player.Pod, player.Email, player.Name)
+
+			if err != nil {
+				fmt.Print(err.Error())
+			}
+
+			defer stmt.Close()
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.Header("Access-Control-Allow-Headers", "access-control-allow-origin, access-control-allow-headers, Content-Type")
+			c.JSON(http.StatusOK, player)
+		}
 	})
 
 	// GET all players belonging to a pod
